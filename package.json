@@ -1,17 +1,40 @@
 {
-    "buildNpmdoc":"sticky-session",
+    "author": "kai zhu <kaizhu256@gmail.com>",
+    "buildNpmdoc": "sticky-session",
+    "description": "api documentation for sticky-session (v1.1.2) [![npm package](https://img.shields.io/npm/v/npmdoc-sticky-session.svg?style=flat-square)](https://www.npmjs.org/package/npmdoc-sticky-session) [![travis-ci.org build-status](https://api.travis-ci.org/npmdoc/node-npmdoc-sticky-session.svg)](https://travis-ci.org/npmdoc/node-npmdoc-sticky-session)",
     "devDependencies": {
-        "sticky-session": "*",
         "electron-lite": "kaizhu256/node-electron-lite#alpha",
+        "sticky-session": "*",
         "utility2": "kaizhu256/node-utility2#alpha"
     },
-    "name":"npmdoc-sticky-session",
+    "engines": {
+        "node": ">=4.0"
+    },
+    "homepage": "https://github.com/npmdoc/node-npmdoc-sticky-session",
+    "keywords": [
+        "documentation",
+        "sticky-session"
+    ],
+    "license": "MIT",
+    "main": "lib.npmdoc_sticky_session.js",
+    "name": "npmdoc-sticky-session",
+    "nameAlias": "npmdoc_sticky_session",
+    "nameOriginal": "npmdoc-sticky-session",
+    "os": [
+        "darwin",
+        "linux"
+    ],
     "repository": {
         "type": "git",
         "url": "https://github.com/npmdoc/node-npmdoc-sticky-session"
     },
     "scripts": {
-        "build-ci": "utility2 shReadmeTest build_ci.sh"
+        "build-ci": "utility2 shReadmeTest build_ci.sh",
+        "env": "env",
+        "heroku-postbuild": "(set -e; npm install \"kaizhu256/node-utility2#alpha\"; utility2 shDeployHeroku)",
+        "postinstall": "if [ -f npm_scripts.sh ]; then ./npm_scripts.sh postinstall; fi",
+        "start": "(set -e; export PORT=${PORT:-8080}; utility2 start test.js)",
+        "test": "(set -e; export PORT=$(utility2 shServerPortRandom); utility2 test test.js)"
     },
     "version": "0.0.1"
 }
