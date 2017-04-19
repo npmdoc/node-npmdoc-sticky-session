@@ -98,6 +98,18 @@
 
         </li>
 
+        <li>
+
+            <span class="apidocSignatureSpan">object <span class="apidocSignatureSpan">sticky-session.</span>api</span>
+
+        </li>
+
+        <li>
+
+            <span class="apidocSignatureSpan">object <span class="apidocSignatureSpan">sticky-session.</span>sticky_session</span>
+
+        </li>
+
     </ol></li>
 
     <li class="apidocModuleLi"><a href="#apidoc.module.sticky-session.Master">module sticky-session.Master</a><ol>
@@ -275,6 +287,41 @@
 
     </ol></li>
 
+    <li class="apidocModuleLi"><a href="#apidoc.module.sticky-session.api">module sticky-session.api</a><ol>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.sticky-session.api.listen">
+            function <span class="apidocSignatureSpan">sticky-session.api.</span>listen
+            <span class="apidocSignatureSpan">(server, port, options)</span>
+            </a>
+
+        </li>
+
+    </ol></li>
+
+    <li class="apidocModuleLi"><a href="#apidoc.module.sticky-session.sticky_session">module sticky-session.sticky_session</a><ol>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.sticky-session.sticky_session.Master">
+            function <span class="apidocSignatureSpan">sticky-session.sticky_session.</span>Master
+            <span class="apidocSignatureSpan">(workerCount, env)</span>
+            </a>
+
+        </li>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.sticky-session.sticky_session.listen">
+            function <span class="apidocSignatureSpan">sticky-session.sticky_session.</span>listen
+            <span class="apidocSignatureSpan">(server, port, options)</span>
+            </a>
+
+        </li>
+
+    </ol></li>
+
 </ol></div>
 
 <div class="apidocSectionDiv">
@@ -428,6 +475,10 @@ if (!sticky.<span class="apidocCodeKeywordSpan">listen</span>(server, 3000)) {
 }
 ...</pre></li>
     </ul>
+
+
+
+
 
 
 
@@ -1045,6 +1096,171 @@ if (!sticky.<span class="apidocCodeKeywordSpan">listen</span>(server, 3000)) {
   return this;
 }</pre></li>
     <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+</div>
+
+<div class="apidocSectionDiv">
+<h1><a href="#apidoc.module.sticky-session.api" id="apidoc.module.sticky-session.api">module sticky-session.api</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.sticky-session.api.listen" id="apidoc.element.sticky-session.api.listen">
+        function <span class="apidocSignatureSpan">sticky-session.api.</span>listen
+        <span class="apidocSignatureSpan">(server, port, options)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">function listen(server, port, options) {
+  if (!options)
+    options = {};
+
+  if (cluster.isMaster) {
+    var workerCount = options.workers || os.cpus().length;
+
+    var master = new Master(workerCount, options.env);
+    master.listen(port);
+    master.once(&#x27;listening&#x27;, function() {
+      server.emit(&#x27;listening&#x27;);
+    });
+    return false;
+  }
+
+  // Override close callback to gracefully close server
+  var oldClose = server.close;
+  server.close = function close() {
+    debug(&#x27;graceful close&#x27;);
+    process.send({ type: &#x27;close&#x27; });
+    return oldClose.apply(this, arguments);
+  };
+
+  process.on(&#x27;message&#x27;, function(msg, socket) {
+    if (msg !== &#x27;sticky:balance&#x27; || !socket)
+      return;
+
+    debug(&#x27;incoming socket&#x27;);
+    server._connections++;
+    socket.server = server;
+    server.emit(&#x27;connection&#x27;, socket);
+  });
+  return true;
+}</pre></li>
+    <li>example usage<pre class="apidocCodePre">...
+var cluster = require(&#x27;cluster&#x27;); // Only required if you want the worker id
+var sticky = require(&#x27;sticky-session&#x27;);
+
+var server = require(&#x27;http&#x27;).createServer(function(req, res) {
+  res.end(&#x27;worker: &#x27; + cluster.worker.id);
+});
+
+if (!sticky.<span class="apidocCodeKeywordSpan">listen</span>(server, 3000)) {
+  // Master code
+  server.once(&#x27;listening&#x27;, function() {
+    console.log(&#x27;server started on 3000 port&#x27;);
+  });
+} else {
+  // Worker code
+}
+...</pre></li>
+    </ul>
+
+
+</div>
+
+<div class="apidocSectionDiv">
+<h1><a href="#apidoc.module.sticky-session.sticky_session" id="apidoc.module.sticky-session.sticky_session">module sticky-session.sticky_session</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.sticky-session.sticky_session.Master" id="apidoc.element.sticky-session.sticky_session.Master">
+        function <span class="apidocSignatureSpan">sticky-session.sticky_session.</span>Master
+        <span class="apidocSignatureSpan">(workerCount, env)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">function Master(workerCount, env) {
+  net.Server.call(this, {
+    pauseOnConnect: true
+  }, this.balance);
+
+  this.env = env || {};
+
+  this.seed = (Math.random() * 0xffffffff) | 0;
+  this.workers = [];
+
+  debug(&#x27;master seed=%d&#x27;, this.seed);
+
+  this.once(&#x27;listening&#x27;, function() {
+    debug(&#x27;master listening on %j&#x27;, this.address());
+
+    for (var i = 0; i &#x3c; workerCount; i++)
+      this.spawnWorker();
+  });
+}</pre></li>
+    <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+
+    <h2>
+        <a href="#apidoc.element.sticky-session.sticky_session.listen" id="apidoc.element.sticky-session.sticky_session.listen">
+        function <span class="apidocSignatureSpan">sticky-session.sticky_session.</span>listen
+        <span class="apidocSignatureSpan">(server, port, options)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">function listen(server, port, options) {
+  if (!options)
+    options = {};
+
+  if (cluster.isMaster) {
+    var workerCount = options.workers || os.cpus().length;
+
+    var master = new Master(workerCount, options.env);
+    master.listen(port);
+    master.once(&#x27;listening&#x27;, function() {
+      server.emit(&#x27;listening&#x27;);
+    });
+    return false;
+  }
+
+  // Override close callback to gracefully close server
+  var oldClose = server.close;
+  server.close = function close() {
+    debug(&#x27;graceful close&#x27;);
+    process.send({ type: &#x27;close&#x27; });
+    return oldClose.apply(this, arguments);
+  };
+
+  process.on(&#x27;message&#x27;, function(msg, socket) {
+    if (msg !== &#x27;sticky:balance&#x27; || !socket)
+      return;
+
+    debug(&#x27;incoming socket&#x27;);
+    server._connections++;
+    socket.server = server;
+    server.emit(&#x27;connection&#x27;, socket);
+  });
+  return true;
+}</pre></li>
+    <li>example usage<pre class="apidocCodePre">...
+var cluster = require(&#x27;cluster&#x27;); // Only required if you want the worker id
+var sticky = require(&#x27;sticky-session&#x27;);
+
+var server = require(&#x27;http&#x27;).createServer(function(req, res) {
+  res.end(&#x27;worker: &#x27; + cluster.worker.id);
+});
+
+if (!sticky.<span class="apidocCodeKeywordSpan">listen</span>(server, 3000)) {
+  // Master code
+  server.once(&#x27;listening&#x27;, function() {
+    console.log(&#x27;server started on 3000 port&#x27;);
+  });
+} else {
+  // Worker code
+}
+...</pre></li>
     </ul>
 
 
